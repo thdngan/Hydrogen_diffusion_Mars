@@ -1,0 +1,45 @@
+{
+    "editor.fontFamily": "Consolas, 'Courier New', monospace",
+    "workbench.colorTheme": "Forgive Green",
+    "workbench.colorCustomizations": {
+        "sideBar.background": "#d1f0d5",  //d1f0d5
+        "editor.background":"#E0F5E3",
+        "editor.selectionBackground": "#5da9e933",
+        "editor.lineHighlightBackground": "#ffadc233",
+        "editor.wordHighlightBackground": "#5da9e94d",
+        "terminal.background": "#C7EDCC",
+        "activityBar.background": "#badec9", //87ab8b, c3d5c5, 9fbca2
+        "activityBar.foreground":"#666666",
+        "focusBorder": "#badec9",
+        "input.border": "#badec9",
+        "list.activeSelectionBackground": "#badec9",
+        "list.inactiveSelectionBackground": "#ffadc266",
+        "panel.border": "#badec9",
+        "sideBarSectionHeader.background": "#badec9",
+        "sideBarSectionHeader.foreground": "#666666",
+        "statusBarItem.prominentBackground": "#000000",
+        "tab.inactiveBackground": "#badec9",
+        "tab.inactiveForeground": "#666666",
+        "statusBar.background": "#2a7a5c",
+        "titleBar.activeBackground": "#91caa8",
+        // "tokenColors": [
+        // {
+        //     "scope": "comment",
+        //     "settings": {
+        //         "foreground": "#da2c43"
+        //     }
+		// },
+        // ]
+    },
+    "editor.tokenColorCustomizations": {
+    "textMateRules": [
+        {
+        "scope": "comment",
+        "settings": {
+            "foreground": "#C21E56"
+        }
+        }
+    ]
+    }
+
+}
