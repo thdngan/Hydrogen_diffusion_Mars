@@ -12,11 +12,11 @@ module diffusion_module
   real(dp), parameter :: M_N = 2.325d-26                    ! kg (mass of a nitrogen atom)
   real(dp), parameter :: R_gas = 8.314472d0             ! N m K^-1 mol^-1  (gas constant)
   real(dp), parameter :: M_CO2 = 0.04401d0                 ! kg/mol (molar mass of CO2)
-  real(dp), parameter :: alpha_T = -0.25d0                 ! Thermal diffusion factor of H, H2 (from Krasnopolsky 2002)
-  ! real(dp), parameter :: alpha_T = 0.0d0                   ! others
-    real(dp), parameter :: D0 = 8.4d0, s = 0.597d0 ! H
+  ! real(dp), parameter :: alpha_T = -0.25d0                 ! Thermal diffusion factor of H, H2 (from Krasnopolsky 2002)
+  real(dp), parameter :: alpha_T = 0.0d0                   ! others
+    ! real(dp), parameter :: D0 = 8.4d0, s = 0.597d0 ! H
   ! real(dp), parameter :: D0 = 2.23d0, s = 0.75d0 ! H2
-  ! real(dp), parameter :: D0 = 1.0d0, s = 0.75d0 ! others
+  real(dp), parameter :: D0 = 1.0d0, s = 0.75d0 ! others
   ! real(dp), parameter :: pi = 4.0d0*DATAN(10.d0)       
   real(dp), parameter :: pi = 3.141592653589793d0 
   ! Mars parameters
@@ -35,8 +35,8 @@ contains
   function temperature_profile(z, Tinf) result(T)
     real(dp), intent(in) :: z, Tinf
     real(dp) :: T
-    real(dp), parameter :: Ttropo = 110.0d0
-    real(dp), parameter :: ztropo = 60.0d5
+    real(dp), parameter :: Ttropo = 130.0d0 !110.0d0
+    real(dp), parameter :: ztropo = 108.0d5 !60.0d5
     real(dp), parameter :: zwidth = 30.0d5
     real(dp), parameter :: lapse = -1.4d-5
     real(dp), parameter :: p4 = 8.0d10
@@ -61,6 +61,37 @@ contains
     T = p(3) - (p(3) - p(1)) * exp(-((z - p(2))**2) / (p(4)*p(3)))
   end function Tcustom
 
+
+  !-----------------------------------------------------------------------
+  !> https://ntrs.nasa.gov/citations/19960042695
+  !-----------------------------------------------------------------------
+  function temperature_MarsGRAM(z, F107, R) result(T)
+    real(dp), intent(in) :: z, F107, R   ! z in cm, R=heliocentric distance of Mars in AU
+    real(dp) :: T
+    real(dp) :: R0, TINF, ZF, TF, SCALE, Zkm, ZZF,RF,YSC
+
+    R0 = 3395.428d0
+    TINF = 156.3d0 + 0.9427d0*F107
+    ZF = 197.94d0 - 49.058d0*R + 8 ! + 8km for Viking Lander 1
+    TF = 113.7d0 + 0.5791d0*F107
+    SCALE = 8.38d0 + 0.09725*F107
+
+    Zkm = z*1.0d-5 ! cm to km
+
+    ZZF = Zkm - ZF
+    RF = R0 + ZF
+    YSC  = ZZF * RF / (RF + ZZF)
+    T = TINF - (TINF - TF) * exp(-YSC / SCALE)
+  end function temperature_MarsGRAM
+
+  !-----------------------------------------------------------------------
+  !> https://www.grc.nasa.gov/www/k-12/airplane/atmosmrm.html
+  !-----------------------------------------------------------------------
+  function temperature_NASA_MAM(z) result(T)
+    real(dp), intent(in) :: z
+    real(dp) :: T
+    T = -23.4 - 0.00222 * z*1.0d-2 + 274.15
+  end function temperature_NASA_MAM
 
   !-----------------------------------------------------------------------
   !> Initializes the altitude grid.
@@ -101,25 +132,25 @@ contains
     integer :: i
     real(8) :: g_local
 
-    do i = 1, size(z)
-        ! Calculate local gravity, converting radii from cm to meters
-        g_local = BIG_G * MARS_MASS / ( ((z(i) + MARS_RADIUS)*1.0d-2)**2 )
-        ! Calculate H in meters, then convert to cm for output
-        H(i) = ( BOLTZMANN_K * T(i) / ( 1.0d0 * M_H * g_local ) ) * 1.0d2
-    end do
     ! do i = 1, size(z)
+    !     ! Calculate local gravity, converting radii from cm to meters
+    !     g_local = BIG_G * MARS_MASS / ( ((z(i) + MARS_RADIUS)*1.0d-2)**2 )
+    !     ! Calculate H in meters, then convert to cm for output
+    !     H(i) = ( BOLTZMANN_K * T(i) / ( 1.0d0 * M_H * g_local ) ) * 1.0d2
+    ! end do
+    do i = 1, size(z)
     !   ! For H
       !  H(i) = (BOLTZMANN_K * T(i) / (1.0d0 * M_H * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For H2
-    !   ! H(i) = (BOLTZMANN_K * T(i) / ((M_H * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
+      ! H(i) = (BOLTZMANN_K * T(i) / ((M_H * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For CO2
       !  H(i) = (BOLTZMANN_K * T(i) / ((M_C + M_O * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For N2
       !  H(i) = (BOLTZMANN_K * T(i) / ((M_N * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For O
-    !   !  H(i) = (BOLTZMANN_K * T(i) / ((M_O * 1.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
+      !  H(i) = (BOLTZMANN_K * T(i) / ((M_O * 1.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For O2
-      !  H(i) = (BOLTZMANN_K * T(i) / ((M_O * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
+       H(i) = (BOLTZMANN_K * T(i) / ((M_O * 2.0d0) * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
 
     !   ! For H2
       ! H(i) = (BOLTZMANN_K * T(i) / (3.34d-27 * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
@@ -131,7 +162,7 @@ contains
       !  H(i) = (BOLTZMANN_K * T(i) / (2.656d-26 * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
     !   ! For O2
       !  H(i) = (BOLTZMANN_K * T(i) / (2.0d0 * 2.656d-26 * BIG_G * MARS_MASS) * ((z(i) + MARS_RADIUS)*1.0d-2)**2) * 1.0d2
-    ! end do
+    end do
   end subroutine scale_height_profile
 
   !-----------------------------------------------------------------------
@@ -415,21 +446,19 @@ contains
   
   end subroutine interfaces
 
-  !--------------------------------------------------------------------------
-  !> @brief  Assemble the tridiagonal coefficient matrices (a, b, c) and
-  !>         RHS vector for the steady-state 1D advection–diffusion equation.
-  !>         This is a finite-difference steady-state formulation.
-  !>         Diffusion term: Centered difference (second order).
-  !>         Advection term: Upwind scheme (first order).
-  !> @param D(:)      Diffusion coefficient profile [cm²/s].
-  !> @param dz        Grid spacing [cm].
-  !> @param T(:)      Temperature profile [K].
-  !> @param H(:)      Scale height profile [cm].
-  !> @param[out] a(:) The sub-diagonal.
-  !> @param[out] b(:) The main diagonal.
-  !> @param[out] c(:) The super-diagonal.
-  !--------------------------------------------------------------------------
-  subroutine finite_difference(D, dz, T, H, a, b, c,rhs)
+!--------------------------------------------------------------------------
+!> @brief Constructs the tridiagonal matrix using a robust finite volume
+!>        upwind scheme. This method is designed to be stable and avoid
+!>        the unphysical oscillations that require scheme-switching.
+!> @param D(:)      Diffusion coefficient profile [cm²/s].
+!> @param dz        Grid spacing [cm].
+!> @param T(:)      Temperature profile [K].
+!> @param H(:)      Scale height profile [cm].
+!> @param[out] a(:) The sub-diagonal.
+!> @param[out] b(:) The main diagonal.
+!> @param[out] c(:) The super-diagonal.
+!--------------------------------------------------------------------------
+  subroutine build_matrix_robust(D, dz, T, H, a, b, c,rhs)
         implicit none
         real(8), intent(in) :: dz
         real(8), dimension(:), intent(in)  :: D, T, H
@@ -495,24 +524,102 @@ contains
             ! end if
         end do
     
-    end subroutine finite_difference
+    end subroutine build_matrix_robust
 
 
-  !------------------------------------------------
-  !> @brief Solves the steady-state 1D diffusion equation for H.
-  !> @details This routine solves the linear system `A*n = b` arising from the
-  !>          discretization of the vertical diffusion equation `dF/dz = 0`, where
-  !>          F is the vertical flux. It uses a tridiagonal Thomas solver.
-  !>          NOTE: The name `crank_nicolson` is a misnomer from previous versions, as this
-  !>          solves the steady-state (d/dt=0) equation, not a time-dependent one.
-  !> @param n_H(:) Initial guess for H profile (used for bottom boundary) [cm⁻³].
-  !> @param D(:) Diffusion coefficient profile [cm²/s].
-  !> @param dz Grid spacing [cm].
-  !> @param T(:) Temperature profile [K].
-  !> @param H(:) Scale height profile [cm].
-  !> @param v_eff Effusion velocity at top boundary [cm/s].
-  !> @param[out] n_H_new(:) The solution H profile [cm⁻³].
-  !------------------------------------------------
+      !--------------------------------------------------------------------------
+      !> @brief  Assemble the tridiagonal coefficient matrices (a, b, c) and
+      !>         RHS vector for the steady-state 1D advection–diffusion equation.
+      !>         This is a finite-difference steady-state formulation.
+      !>         Diffusion term: Centered difference (second order).
+      !>         Advection term: Upwind scheme (first order).
+      !> @param D(:)      Diffusion coefficient profile [cm²/s].
+      !> @param dz        Grid spacing [cm].
+      !> @param T(:)      Temperature profile [K].
+      !> @param H(:)      Scale height profile [cm].
+      !> @param[out] a(:) The sub-diagonal.
+      !> @param[out] b(:) The main diagonal.
+      !> @param[out] c(:) The super-diagonal.
+      !--------------------------------------------------------------------------
+      subroutine finite_difference(D, dz, T, H, a, b, c, rhs)
+            implicit none
+            real(8), intent(in) :: dz
+            real(8), dimension(:), intent(in)  :: D, T, H
+            real(8), dimension(size(D)), intent(out) :: a, b, c, rhs
+        
+            integer :: i, N
+            real(8) :: D_up, D_dn      ! Diffusion coeff at interfaces i+1/2 and i-1/2
+            real(8) :: phi_up, phi_dn  ! Advection coeff 'phi' at interfaces
+            real(8) :: T_up, T_dn, H_up, H_dn
+            real(8) :: dTdz_up, dTdz_dn
+            real(8) :: v_up, v_dn    ! drift terms at interfaces (cm/s)
+        
+            N = size(D)
+        
+            ! Zero out the arrays
+            a = 0.0d0
+            b = 0.0d0
+            c = 0.0d0
+            rhs = 0.0d0
+        
+            do i = 2, N - 1
+                ! --- Properties at the 'downstream' interface (i+1/2) ---
+                D_up    = 0.5d0 * (D(i) + D(i+1))
+                T_up    = 0.5d0 * (T(i) + T(i+1))
+                H_up    = 0.5d0 * (H(i) + H(i+1))
+                dTdz_up = (T(i+1) - T(i)) / dz
+                phi_up  = (1.0d0/H_up)+((1.0d0+alpha_T)/T_up)*dTdz_up
+                ! Drift term at i+1/2
+                v_up   = D_up * phi_up
+        
+                ! --- Properties at the 'upstream' interface (i-1/2) ---
+                D_dn    = 0.5d0 * (D(i) + D(i-1))
+                T_dn    = 0.5d0 * (T(i) + T(i-1))
+                H_dn    = 0.5d0 * (H(i) + H(i-1))
+                dTdz_dn = (T(i) - T(i-1)) / dz
+                phi_dn  = (1.0d0/H_dn)+((1.0d0+alpha_T)/T_dn)*dTdz_dn
+                ! Drift term at i-1/2
+                v_dn   = D_dn * phi_dn
+        
+                ! --- Calculate tridiagonal coefficients a(i), b(i), c(i) ---
+                ! Based on the flux balance: F_up - F_dn = 0
+                ! F = Diffusive_Flux + Advective_Flux
+                ! Diffusive_Flux = -D/dz * (n_i+1 - n_i)
+                ! Advective_Flux (upwinded) = -Pe * n_i   (if Pe > 0)
+                !                             -Pe * n_i+1 (if Pe < 0)
+        
+                ! Coefficient for n(i-1)
+            !     a(i) = -D_dn / dz**2 - max(v_dn, 0.0d0) / dz
+                a(i) = -D_dn / dz**2 + min(v_dn, 0.0d0) / dz
+        
+                ! Coefficient for n(i+1)
+            !     c(i) = -D_up / dz**2 + min(v_up, 0.0d0) / dz
+                c(i) = -D_up / dz**2 - max(v_up, 0.0d0) / dz
+        
+                ! Coefficient for n(i)
+            !     b(i) = (D_up + D_dn) / dz**2 + max(-v_up, 0.0d0)/dz
+!      &                 - min(v_dn, 0.0d0) / dz
+                b(i) = (D_up + D_dn) / dz**2 - min(v_up, 0.0d0)/dz + max(v_dn, 0.0d0) / dz
+        
+                ! The right-hand-side for the steady state is 0 for interior points.
+            end do
+        
+        end subroutine finite_difference
+
+  !-----------------------------------------------------------------------
+  !> Solves continuity equation dn/dt = -dՓ/dz using Crank-Nicolson scheme
+  !> and use the Thomas algorithm for solving the tridiagonal system.
+  !> Parameters:
+  !>     n_H: Input number density profile (cm^-3).
+  !>     D: Molecular diffusion coefficient D(z) (cm^2/s).
+  !>     dz: Grid spacing (cm). 
+  !>     T: Temperature profile (K).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+  !>     H: Scale height (cm).
+  !>     v_eff: Effusion velocity (cm/s).
+  !>
+  !> Returns:
+  !>     n_H_new: New H number density profile (cm^-3).
+  !-----------------------------------------------------------------------
   ! subroutine crank_nicolson(n_H, D, dz, T, H, v_eff, n_H_new)
   subroutine crank_nicolson ( &
         n_H     , D, dz, T, H,                     & 
@@ -541,8 +648,9 @@ contains
 
    ! Set up tridiagonal matrix
   !  call CN_matrix(n_H, D, dz, T, H, a, b, c, rhs)
-   call finite_difference(D, dz, T, H, a, b, c, rhs)
+  !  call build_matrix_robust(D, dz, T, H, a, b, c, rhs)
   !  call interfaces(n_H, D, dz, T, H, a, b, c, rhs)
+    call finite_difference(D, dz, T, H, a, b, c,rhs)
 
    ! Bottom boundary conditions
    b(1) = 1.0d0
@@ -614,72 +722,72 @@ contains
     ! print*, 'n_H bottom = ', n_H_new(1), &
           ! ' n_H top = ', n_H_new(num_levels)
 
-    ! if (n_H_new(1) < n_H_new(2)) then
-    !   print*,'CN failed: n_H bottom = ', n_H_new(1), &
-    !         ' n_H next = ', n_H_new(2), &
-    !         ' n_H top = ', n_H_new(num_levels)
-    !   print*, 'choosing interfaces'
-    !   call interfaces(n_H, D, dz, T, H, a, b, c, rhs)
-    !   ! Reapply the boundary conditions
-    !   ! Bottom boundary conditions
-    !   b(1) = 1.0d0
-    !   c(1) = 0.0d0
-    !   a(1) = 0.0d0
-    !   rhs(1) = n_H(1)
+    if (n_H_new(1) < n_H_new(2)) then
+      print*,'CN failed: n_H bottom = ', n_H_new(1), &
+            ' n_H next = ', n_H_new(2), &
+            ' n_H top = ', n_H_new(num_levels)
+      print*, 'choosing interfaces'
+      call interfaces(n_H, D, dz, T, H, a, b, c, rhs)
+      ! Reapply the boundary conditions
+      ! Bottom boundary conditions
+      b(1) = 1.0d0
+      c(1) = 0.0d0
+      a(1) = 0.0d0
+      rhs(1) = n_H(1)
 
-    !   ! Top Robin boundary
-    !   D_top = (D(N) + D(N-1)) / 2.0d0
-    !   H_top = (H(N) + H(N-1)) / 2.0d0
-    !   T_top = (T(N) + T(N-1)) / 2.0d0
-    !   dTdz = (T(N) - T(N-1)) / dz
+      ! Top Robin boundary
+      D_top = (D(N) + D(N-1)) / 2.0d0
+      H_top = (H(N) + H(N-1)) / 2.0d0
+      T_top = (T(N) + T(N-1)) / 2.0d0
+      dTdz = (T(N) - T(N-1)) / dz
 
-    !   coeff = 1.0d0 / H_top + (1.0d0 + alpha_T) / T_top * dTdz
-    !   !  beta = v_eff * dz + D_top + D_top * coeff * dz
-    !   !  gamma = -D_top
+      coeff = 1.0d0 / H_top + (1.0d0 + alpha_T) / T_top * dTdz
+      !  beta = v_eff * dz + D_top + D_top * coeff * dz
+      !  gamma = -D_top
 
-    !   !  a(N) = gamma
-    !   !  b(N) = beta
-    !   !  c(N) = 0.0d0
-    !   !  rhs(N) = 0.0d0
+      !  a(N) = gamma
+      !  b(N) = beta
+      !  c(N) = 0.0d0
+      !  rhs(N) = 0.0d0
 
-    !   ! ─── top boundary ( i = N ) ─────────────────────────────────────────────
-    !     select case (bc_top_type)
+      ! ─── top boundary ( i = N ) ─────────────────────────────────────────────
+        select case (bc_top_type)
 
-    !     case ('n')          ! n = constant
-    !       print*, 'select case n'
-    !       a(N)   = -1.0d0
-    !       b(N)   = 1.0d0
-    !       c(N)   = 0.0d0
-    !       rhs(N) = 0.0d0
+        case ('n')          ! n = constant
+          print*, 'select case n'
+          a(N)   = -1.0d0
+          b(N)   = 1.0d0
+          c(N)   = 0.0d0
+          rhs(N) = 0.0d0
 
-    !     case ('f')               ! F = constant  (positive = upward escape)
-    !       !  +D ∂n/∂z = F   (sign flipped because upward is +z)
-    !       print*, 'select case f'
-    !       a(N)   = -D_top
-    !       b(N)   = D_top + D_top * coeff * dz
-    !       c(N)   = 0.0d0
-    !       rhs(N) = bc_top_val * dz
+        case ('f')               ! F = constant  (positive = upward escape)
+          !  +D ∂n/∂z = F   (sign flipped because upward is +z)
+          print*, 'select case f'
+          a(N)   = -D_top
+          b(N)   = D_top + D_top * coeff * dz
+          c(N)   = 0.0d0
+          rhs(N) = bc_top_val * dz
 
-    !     case ('v')           ! v_escape · n  (Robin condition)
-    !       print*, 'select case v'
-    !       !  −D ∂n/∂z = v n   ➋
-    !       !  FD:  (n(N) − n(N-1)) / dz = -v/D * n(N)
-    !       v_eff = effusion_velocity(T(num_levels), bc_top_val, z_top)
-    !       print*, 'v_eff = ', v_eff
-    !       beta = v_eff * dz + D_top + D_top * coeff * dz
-    !       gamma = -D_top
+        case ('v')           ! v_escape · n  (Robin condition)
+          print*, 'select case v'
+          !  −D ∂n/∂z = v n   ➋
+          !  FD:  (n(N) − n(N-1)) / dz = -v/D * n(N)
+          v_eff = effusion_velocity(T(num_levels), bc_top_val, z_top)
+          print*, 'v_eff = ', v_eff
+          beta = v_eff * dz + D_top + D_top * coeff * dz
+          gamma = -D_top
       
-    !       a(N) = gamma
-    !       b(N) = beta
-    !       c(N) = 0.0d0
-    !       rhs(N) = 0.0d0
+          a(N) = gamma
+          b(N) = beta
+          c(N) = 0.0d0
+          rhs(N) = 0.0d0
 
-    !     case default
-    !       stop "Unknown top BC"
+        case default
+          stop "Unknown top BC"
 
-    !     end select
-    !     call Thomas(a, b, c, rhs, n_H_new)
-    ! end if
+        end select
+        call Thomas(a, b, c, rhs, n_H_new)
+    end if
 
   end subroutine crank_nicolson
 
